@@ -28,6 +28,12 @@ const TURF_Y = 704;              // 芝生の上面 = ここに触れたら負�
 const PIECE_H = 128;             // ウマ娘 1 体の高さ
 const DROP_GAP = 34;             // 塔のてっぺんからどれくらい上に出現させるか
 const TURN_TIME = 30;
+// --- 静止判定 (緩めると、まだ動いているのに手番が回ってしまう) ---
+const SETTLE_SPEED = 0.08;       // 1 ステップあたりの移動量 (約 5px/秒)
+const SETTLE_SPIN = 0.004;       // 1 ステップあたりの回転量 (約 14度/秒)
+const SETTLE_HOLD = 0.5;         // この秒数ぶん静止し続けたら手番交代
+const SETTLE_RELAX_AFTER = 10;   // これを過ぎたら判定を緩める (細かい揺れで止まらない対策)
+const SETTLE_FORCE_AFTER = 20;   // 最後の保険。ここまで来たら諦めて交代する
 const PX_PER_CM = 2;             // 高さ表示用のスケール
 const PRELOAD_FIRST = 12;        // タイトルで待つ体数
 const ROSTER_SIZE = 30;          // 1 ゲームで使う体数 (毎回ランダムに選ぶ)
@@ -307,13 +313,13 @@ function step(dt) {
   // --- 落下中 → 静止判定 ---
   if (game.state === 'falling') {
     game.fallTimer += dt;
-    if (isSettled()) {
+    if (isSettled(game.fallTimer > SETTLE_RELAX_AFTER)) {
       game.settleTimer += dt;
-      if (game.settleTimer > 0.35) nextTurn();
+      if (game.settleTimer > SETTLE_HOLD) nextTurn();
     } else {
       game.settleTimer = 0;
     }
-    if (game.fallTimer > 6) nextTurn();       // 念のためのタイムアウト
+    if (game.fallTimer > SETTLE_FORCE_AFTER) nextTurn();
     // 場外に飛んでいったものも負けにする
     for (const b of placed) {
       if (b.position.y > TURF_Y + 400 || Math.abs(b.position.x - CX) > 1400) {
@@ -339,10 +345,14 @@ function step(dt) {
   if (game.net === 'host') netHostTick(dt);
 }
 
-function isSettled() {
+// relaxed: 長引いたときだけ判定を緩める。
+// 落下中のウマ娘を「静止」と誤判定しないよう、通常の閾値はかなり厳しめにしてある。
+function isSettled(relaxed) {
+  const maxSpeed = relaxed ? 0.3 : SETTLE_SPEED;
+  const maxSpin = relaxed ? 0.02 : SETTLE_SPIN;
   for (const b of placed) {
     if (b.isSleeping) continue;
-    if (b.speed > 0.32 || b.angularSpeed > 0.022) return false;
+    if (b.speed > maxSpeed || b.angularSpeed > maxSpin) return false;
   }
   return true;
 }
