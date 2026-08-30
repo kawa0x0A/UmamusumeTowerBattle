@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+<title>ウマ娘タワーバトル</title>
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+<div id="app">
+  <header id="hud">
+    <div class="turn" id="turnBox">
+      <span class="badge" id="turnBadge">P1</span>
+      <span class="turn-name" id="turnName">プレイヤー1</span>
+    </div>
+    <div class="stats">
+      <div class="stat"><b id="statCount">0</b><span>段</span></div>
+      <div class="stat"><b id="statHeight">0</b><span>cm</span></div>
+    </div>
+    <div class="timer">
+      <div class="timer-bar"><i id="timerFill"></i></div>
+      <span id="timerText">30</span>
+    </div>
+  </header>
+
+  <div id="stage">
+    <canvas id="field"></canvas>
+    <div id="pieceLabel"><span id="pieceName">—</span></div>
+    <div id="toast"></div>
+  </div>
+
+  <footer id="controls">
+    <button class="ctl" id="btnRotL" title="左に回す">⟲</button>
+    <button class="ctl wide" id="btnDrop">おろす</button>
+    <button class="ctl" id="btnRotR" title="右に回す">⟳</button>
+  </footer>
+
+  <p id="hint">ドラッグで左右に動かす／上下で回す・指を離すと落下　（キーボード: ←→ 移動 / ↑↓ 回転 / Space 落下）</p>
+</div>
+
+<!-- ===================== タイトル / 結果 オーバーレイ ===================== -->
+<div id="overlay" class="show">
+  <div class="panel" id="titlePanel">
+    <h1>ウマ娘<br><span>タワーバトル</span></h1>
+    <div id="modeStep">
+      <p class="lead">公式サイトのウマ娘を積み上げろ。<br>落としたら負け。</p>
+
+      <div class="modes">
+        <button class="mode" data-mode="cpu">CPU と対戦</button>
+        <button class="mode" data-mode="vs">2人で対戦</button>
+        <button class="mode" data-mode="solo">ひとりで積む</button>
+      </div>
+    </div>
+
+    <div id="vsStep" hidden>
+      <p class="lead">2人で対戦</p>
+
+      <div class="modes">
+        <button class="mode" id="btnLocalVs">この端末で交互に<small>1台のスマホ・PCを2人で回す</small></button>
+        <button class="mode" id="btnHost">部屋をつくる<small>合言葉を発行して相手を待つ</small></button>
+        <button class="mode" id="btnJoin">合言葉で参加<small>相手の合言葉を入力してつなぐ</small></button>
+        <button class="mode ghost" data-back="mode">もどる</button>
+      </div>
+      <p class="note" id="onlineNote" hidden></p>
+    </div>
+
+    <div id="hostStep" hidden>
+      <p class="lead">この合言葉を相手に伝えてください。</p>
+      <div class="roomcode-row">
+        <div class="roomcode" id="roomCode">····</div>
+        <button class="copybtn" id="btnCopyCode" disabled>コピー</button>
+      </div>
+      <p class="note" id="hostStatus">部屋をつくっています…</p>
+      <div class="modes">
+        <button class="mode ghost" data-back="vs">やめる</button>
+      </div>
+    </div>
+
+    <div id="joinStep" hidden>
+      <p class="lead">相手の合言葉を入力してください。</p>
+      <input id="joinCode" class="codeinput" type="text" maxlength="4" placeholder="ABCD"
+             inputmode="text" autocapitalize="characters" autocomplete="off" spellcheck="false">
+      <p class="note" id="joinStatus"></p>
+      <div class="modes">
+        <button class="mode" id="btnJoinGo">参加する</button>
+        <button class="mode ghost" data-back="vs">もどる</button>
+      </div>
+    </div>
+
+    <div id="diffStep" hidden>
+      <p class="lead">CPU の強さをえらんでください。</p>
+
+      <div class="modes">
+        <button class="mode" data-diff="easy">かんたん<small>けっこう雑に置いてくる</small></button>
+        <button class="mode" data-diff="normal">ふつう<small>そこそこ考えて置いてくる</small></button>
+        <button class="mode" data-diff="hard">つよい<small>平らな所を的確に狙ってくる</small></button>
+        <button class="mode ghost" data-back="mode">もどる</button>
+      </div>
+    </div>
+
+    <div class="loading" id="loadingBox">
+      <div class="loading-bar"><i id="loadFill"></i></div>
+      <p id="loadText">ウマ娘を読み込み中…</p>
+    </div>
+
+    <p class="credit">キャラクター画像は
+      <a href="https://umamusume.jp/character/" target="_blank" rel="noopener">ウマ娘 プリティーダービー 公式ポータルサイト</a>
+      の画像をURL参照で表示しています。&copy; Cygames, Inc.</p>
+  </div>
+
+  <div class="panel result" id="resultPanel" hidden>
+    <h2 id="resultTitle">けっか</h2>
+    <div class="result-face"><canvas id="resultFace" width="180" height="180"></canvas></div>
+    <p id="resultText"></p>
+    <div class="result-stats">
+      <div><b id="resultCount">0</b><span>段</span></div>
+      <div><b id="resultHeight">0</b><span>cm</span></div>
+    </div>
+    <div class="modes">
+      <button class="mode" id="btnRetry">もう一度</button>
+      <button class="mode ghost" id="btnTitle">タイトルへ</button>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/matter-js@0.20.0/build/matter.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/poly-decomp@0.3.0/build/decomp.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/peerjs@1.5.4/dist/peerjs.min.js"></script>
+<script src="data/characters.js"></script>
+<script src="silhouette.js"></script>
+<script src="net.js"></script>
+<script src="game.js"></script>
+</body>
+</html>

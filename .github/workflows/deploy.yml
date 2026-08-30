@@ -1,0 +1,43 @@
+name: Deploy to GitHub Pages
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+  actions: read # deploy-pages@v4 以降が成果物の取得に必要とする
+
+# 同時デプロイを避ける（進行中のものは打ち切る）
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: 公開するファイルだけを集める
+        # tools/ や .claude/ など、遊ぶのに不要なものは配信しない
+        run: |
+          mkdir -p _site/data
+          cp index.html styles.css game.js net.js silhouette.js robots.txt _site/
+          cp data/characters.js _site/data/
+          touch _site/.nojekyll
+
+      - uses: actions/configure-pages@v5
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: _site
+
+      - id: deployment
+        uses: actions/deploy-pages@v5
